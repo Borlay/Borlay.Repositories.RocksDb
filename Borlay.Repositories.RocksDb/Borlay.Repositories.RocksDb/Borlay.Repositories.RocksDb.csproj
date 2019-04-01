@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>netstandard1.6</TargetFramework>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Borlay.Arrays" Version="1.0.1" />
+    <PackageReference Include="Borlay.Repositories" Version="1.0.4" />
+    <PackageReference Include="Borlay.Serialization" Version="1.0.0" />
+    <PackageReference Include="RocksDbNative" Version="5.17.2" />
+    <PackageReference Include="RocksDbSharp" Version="5.17.2" />
+  </ItemGroup>
+
+</Project>
