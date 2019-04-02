@@ -13,6 +13,7 @@ namespace Borlay.Repositories.RocksDb
         public Order Order { get; set; } = Order.Desc;
 
         public bool AllowOrderDublicates { get; set; } = true;
+        public bool SkipDublicates { get; set; } = true;
 
         protected int index = 0;
 
@@ -80,19 +81,23 @@ namespace Borlay.Repositories.RocksDb
 
         public virtual async Task<T[]> Get(ByteArray userId, int skip, int take)
         {
-            var key = GetKey(userId, 1);
+            var skey = GetKey(userId, 1);
             using (var iterator = db.NewIterator())
             {
                 List<T> list = new List<T>();
 
-                var it = iterator.Seek(key);
+                var it = iterator.Seek(skey);
                 while (it.Valid() && take != 0)
                 {
-                    if (!it.Key().ContainsSequence32(key)) break;
+                    if (!it.Key().ContainsSequence32(skey)) break;
 
                     if (skip <= 0)
                     {
-                        var value = it.Value();
+                        var entityIdBytes = it.Value();
+
+                        var key = GetKey(userId, entityIdBytes, 0);
+                        var value = db.Get(key);
+
                         var index = 0;
                         var entity = serializer.GetObject(value, ref index);
                         list.Add((T)entity);

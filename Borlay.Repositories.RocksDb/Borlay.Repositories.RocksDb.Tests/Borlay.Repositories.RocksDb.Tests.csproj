@@ -1,15 +1,24 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>netstandard1.6</TargetFramework>
+    <TargetFramework>netcoreapp2.1</TargetFramework>
+
+    <IsPackable>false</IsPackable>
   </PropertyGroup>
 
   <ItemGroup>
     <PackageReference Include="Borlay.Arrays" Version="1.0.2" />
     <PackageReference Include="Borlay.Repositories" Version="1.0.4" />
     <PackageReference Include="Borlay.Serialization" Version="1.0.1" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="15.9.0" />
+    <PackageReference Include="MSTest.TestAdapter" Version="1.3.2" />
+    <PackageReference Include="MSTest.TestFramework" Version="1.3.2" />
     <PackageReference Include="RocksDbNative" Version="5.17.2" />
     <PackageReference Include="RocksDbSharp" Version="5.17.2" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Borlay.Repositories.RocksDb\Borlay.Repositories.RocksDb.csproj" />
   </ItemGroup>
 
 </Project>

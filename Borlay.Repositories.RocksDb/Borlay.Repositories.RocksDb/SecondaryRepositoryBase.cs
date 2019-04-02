@@ -35,7 +35,12 @@ namespace Borlay.Repositories.RocksDb
 
         protected virtual byte[] GetKey(ByteArray userId, ByteArray entityId, byte bit)
         {
-            var key = new byte[userName.Length + userId.Bytes.Length + entityName.Length + entityId.Bytes.Length + 1];
+            return GetKey(userId, entityId.Bytes, bit);
+        }
+
+        protected virtual byte[] GetKey(ByteArray userId, byte[] entityId, byte bit)
+        {
+            var key = new byte[userName.Length + userId.Bytes.Length + entityName.Length + entityId.Length + 1];
 
             var index = 0;
             key.CopyFrom(userName, ref index);
