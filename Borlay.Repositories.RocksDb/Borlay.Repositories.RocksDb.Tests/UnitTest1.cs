@@ -97,7 +97,7 @@ namespace Borlay.Repositories.RocksDb.Tests
                 watch.Stop();
 
                 // not allow
-                // 10k 0.85s + del - 2.s
+                // 10k 0.85s + del - 7.2s
 
                 // allow
                 // 10k 0.85s

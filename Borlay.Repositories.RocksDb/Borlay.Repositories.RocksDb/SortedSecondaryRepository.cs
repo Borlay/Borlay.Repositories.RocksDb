@@ -57,16 +57,21 @@ namespace Borlay.Repositories.RocksDb
                     if (Order == Order.Desc)
                         existScore = long.MaxValue - existScore;
 
-                    if (existScore != score)
-                    {
-                        if (BitConverter.IsLittleEndian)
-                            Array.Reverse(existScoreBytes);
-
-                        var existskey = GetScoreKey(userId, entity.Id, existScoreBytes);
-                        batch.Delete(existskey);
-                    }
-                    else
+                    // replaced bellow
+                    if(existScore == score)
                         addSKey = false;
+
+                    //if (existScore != score)
+                    //{
+                    //    if (BitConverter.IsLittleEndian)
+                    //        Array.Reverse(existScoreBytes);
+
+                    //    var existskey = GetScoreKey(userId, entity.Id, existScoreBytes);
+                    //    var val = db.Get(existskey);
+                    //    batch.Delete(existskey);
+                    //}
+                    //else
+                    //    addSKey = false;
                 }
             }
 
