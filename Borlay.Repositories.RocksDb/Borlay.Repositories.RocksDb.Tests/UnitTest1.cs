@@ -1,6 +1,7 @@
 using Borlay.Arrays;
 using Borlay.Serialization.Notations;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
+using System;
 using System.Diagnostics;
 using System.IO;
 using System.Threading.Tasks;
@@ -81,17 +82,23 @@ namespace Borlay.Repositories.RocksDb.Tests
 
                 var e1 = Create("e1", 110);
                 var user1 = ByteArray.New(32);
+                var entities = new TestEntity[10];
+
+                for(int i = 0; i < entities.Length; i++)
+                {
+                    entities[i] = Create($"e{i}", 110 + i);
+                }
 
                 var watch = Stopwatch.StartNew();
 
-                for (int i = 0; i < 10000; i++)
+                for (int i = 0; i < 100000; i++)
                 {
                     e1.Score = i;
-                    await repository.Save(user1, e1);
+                    repository.Save(user1, entities);
 
-                    var ge1 = await repository.Get(user1, e1.Id);
+                    //var ge1 = await repository.Get(user1, entities[0].Id);
 
-                    var u1ge = await repository.Get(user1, 0, 10);
+                    var u1ge = await repository.Get(user1, 0, 2);
                 }
 
                 watch.Stop();
@@ -115,7 +122,10 @@ namespace Borlay.Repositories.RocksDb.Tests
             {
                 Id = ByteArray.New(32),
                 Name = name,
-                Score = score
+                Score = score,
+                Param1 = Guid.NewGuid().ToString(),
+                Param2 = Guid.NewGuid().ToString(),
+                Param3 = Guid.NewGuid().ToString(),
             };
         }
     }
@@ -128,6 +138,15 @@ namespace Borlay.Repositories.RocksDb.Tests
 
         [Include(1, true)]
         public string Name { get; set; }
+
+        [Include(2, false)]
+        public string Param1 { get; set; }
+
+        [Include(3, false)]
+        public string Param2 { get; set; }
+
+        [Include(4, false)]
+        public string Param3 { get; set; }
 
         public long Score { get; set; }
     }

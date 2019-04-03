@@ -2,6 +2,7 @@
 using Borlay.Serialization.Converters;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
@@ -31,6 +32,24 @@ namespace Borlay.Repositories.RocksDb
             var index = 0;
             var entity = serializer.GetObject(value, ref index);
             return (T)entity;
+        }
+
+        public virtual async Task<T[]> Get(ByteArray userId, ByteArray[] entityIds)
+        {
+            var keys = entityIds.Select(id => GetKey(userId, id, 0)).ToArray();
+            var values = db.MultiGet(keys);
+
+            var result = new T[values.Length];
+
+            var index = 0;
+            for(int i = 0; i < result.Length; i++)
+            {
+                index = 0;
+                var entity = serializer.GetObject(values[i].Value, ref index);
+                result[i] = (T)entity;
+            }
+
+            return result;
         }
 
         protected virtual byte[] GetKey(ByteArray userId, ByteArray entityId, byte bit)

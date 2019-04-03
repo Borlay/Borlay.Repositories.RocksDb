@@ -24,6 +24,27 @@ namespace Borlay.Repositories.RocksDb
 
         public async Task Save(ByteArray userId, T entity)
         {
+            WriteBatch batch = new WriteBatch();
+
+            Append(batch, userId, entity);
+
+            db.Write(batch);
+        }
+
+        public async Task Save(ByteArray userId, T[] entities)
+        {
+            WriteBatch batch = new WriteBatch();
+
+            foreach(var entity in entities)
+            {
+                Append(batch, userId, entity);
+            }
+
+            db.Write(batch);
+        }
+
+        public void Append(WriteBatch batch, ByteArray userId, T entity)
+        {
             var score = DateTimeOffset.Now.ToUnixTimeMilliseconds();
             if (entity is IScoreEntity scoreEntity)
                 score = scoreEntity.Score;
@@ -38,16 +59,14 @@ namespace Borlay.Repositories.RocksDb
             var index = 0;
             serializer.AddBytes(entity, value, ref index);
 
-            WriteBatch batch = new WriteBatch();
-
             batch.Put(key, (ulong)key.Length, value, (ulong)index);
-            
+
 
             bool addSKey = true;
-            if(!AllowOrderDublicates)
+            if (!AllowOrderDublicates)
             {
                 var existScoreBytes = db.Get(scoreKey);
-                if(existScoreBytes != null && existScoreBytes.Length > 0)
+                if (existScoreBytes != null && existScoreBytes.Length > 0)
                 {
                     if (BitConverter.IsLittleEndian)
                         Array.Reverse(existScoreBytes);
@@ -57,8 +76,8 @@ namespace Borlay.Repositories.RocksDb
                     if (Order == Order.Desc)
                         existScore = long.MaxValue - existScore;
 
-                    // replaced bellow
-                    if(existScore == score)
+                    //replaced bellow
+                    if (existScore == score)
                         addSKey = false;
 
                     //if (existScore != score)
@@ -68,6 +87,7 @@ namespace Borlay.Repositories.RocksDb
 
                     //    var existskey = GetScoreKey(userId, entity.Id, existScoreBytes);
                     //    var val = db.Get(existskey);
+
                     //    batch.Delete(existskey);
                     //}
                     //else
@@ -75,13 +95,11 @@ namespace Borlay.Repositories.RocksDb
                 }
             }
 
-            if(addSKey)
+            if (addSKey)
             {
                 batch.Put(skey, entity.Id.Bytes);
                 batch.Put(scoreKey, scoreBytes);
             }
-
-            db.Write(batch);
         }
 
         public virtual async Task<T[]> Get(ByteArray userId, int skip, int take)
