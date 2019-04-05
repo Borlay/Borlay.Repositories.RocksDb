@@ -10,16 +10,18 @@ namespace Borlay.Repositories.RocksDb
 {
     public class SortedSecondaryRepository<T> : SecondaryRepositoryBase<T>, ISortedSecondaryRepository<T> where T : IEntity
     {
-        public Order Order { get; set; } = Order.Desc;
+        public Order SaveOrder { get; set; } = Order.Desc;
+        public Order ScoreOrder { get; set; } = Order.Desc;
+        public Order DateOrder { get; set; } = Order.Desc;
 
-        public bool AllowOrderDublicates { get; set; } = true;
-        public bool SkipDublicates { get; set; } = true;
-
-        protected int index = 0;
+        protected readonly WriteOptions writeOptions;
 
         public SortedSecondaryRepository(RocksDbSharp.RocksDb rocksDb, Serializer serializer)
             : base(rocksDb, serializer)
         {
+            writeOptions = new WriteOptions();
+            writeOptions.SetSync(true);
+            
         }
 
         public async Task Save(ByteArray userId, T entity)
@@ -28,83 +30,93 @@ namespace Borlay.Repositories.RocksDb
 
             Append(batch, userId, entity);
 
-            db.Write(batch);
+            db.Write(batch, writeOptions);
         }
 
         public async Task Save(ByteArray userId, T[] entities)
         {
             WriteBatch batch = new WriteBatch();
-
+            
             foreach(var entity in entities)
             {
                 Append(batch, userId, entity);
             }
 
-            db.Write(batch);
+            db.Write(batch, writeOptions);
         }
 
         public void Append(WriteBatch batch, ByteArray userId, T entity)
         {
-            var score = DateTimeOffset.Now.ToUnixTimeMilliseconds();
-            if (entity is IScoreEntity scoreEntity)
-                score = scoreEntity.Score;
-
-            var scoreBytes = GetScoreBytes(score);
-
             var key = GetKey(userId, entity.Id, 0);
-            var skey = GetScoreKey(userId, entity.Id, scoreBytes);
-            var scoreKey = GetKey(userId, entity.Id, 2);
-
             var value = new byte[BufferSize];
             var index = 0;
             serializer.AddBytes(entity, value, ref index);
-
             batch.Put(key, (ulong)key.Length, value, (ulong)index);
 
 
-            bool addSKey = true;
-            if (!AllowOrderDublicates)
+            if (entity is IScoreEntity scoreEntity)
             {
-                var existScoreBytes = db.Get(scoreKey);
-                if (existScoreBytes != null && existScoreBytes.Length > 0)
+                var score = scoreEntity.Score;
+                if (ScoreOrder.HasFlag(Order.Asc))
                 {
-                    if (BitConverter.IsLittleEndian)
-                        Array.Reverse(existScoreBytes);
+                    var skey = GetScoreKey(userId, entity.Id, score, Order.Asc);
+                    batch.Put(skey, entity.Id.Bytes);
+                }
 
-                    var existScore = BitConverter.ToInt64(existScoreBytes, 0);
-
-                    if (Order == Order.Desc)
-                        existScore = long.MaxValue - existScore;
-
-                    //replaced bellow
-                    if (existScore == score)
-                        addSKey = false;
-
-                    //if (existScore != score)
-                    //{
-                    //    if (BitConverter.IsLittleEndian)
-                    //        Array.Reverse(existScoreBytes);
-
-                    //    var existskey = GetScoreKey(userId, entity.Id, existScoreBytes);
-                    //    var val = db.Get(existskey);
-
-                    //    batch.Delete(existskey);
-                    //}
-                    //else
-                    //    addSKey = false;
+                if (ScoreOrder.HasFlag(Order.Desc))
+                {
+                    var skey = GetScoreKey(userId, entity.Id, score, Order.Desc);
+                    batch.Put(skey, entity.Id.Bytes);
                 }
             }
 
-            if (addSKey)
+            if (entity is IDateEntity dateEntity)
             {
-                batch.Put(skey, entity.Id.Bytes);
-                batch.Put(scoreKey, scoreBytes);
+                var score = dateEntity.Date;
+                if (DateOrder.HasFlag(Order.Asc))
+                {
+                    var skey = GetDateKey(userId, entity.Id, score, Order.Asc); // todo dont use GetDateKey, see bellow
+                    batch.Put(skey, entity.Id.Bytes);
+                }
+
+                if (DateOrder.HasFlag(Order.Desc))
+                {
+                    var skey = GetDateKey(userId, entity.Id, score, Order.Desc);
+                    batch.Put(skey, entity.Id.Bytes);
+                }
+            }
+
+
+            var date = DateTime.Now;
+
+            if (SaveOrder.HasFlag(Order.Asc))
+            {
+                var dateKey = GetDateKey(userId, entity.Id, date, Order.Asc);
+                batch.Put(dateKey, key);
+            }
+
+            if (SaveOrder.HasFlag(Order.Desc))
+            {
+                var dateKey = GetDateKey(userId, entity.Id, date, Order.Desc);
+                batch.Put(dateKey, key);
             }
         }
 
-        public virtual async Task<T[]> Get(ByteArray userId, int skip, int take)
+        public virtual Task<T[]> Get(ByteArray userId, int skip, int take)
         {
             var skey = GetKey(userId, 1);
+            return Get(skey, entityIdBytes => GetKey(userId, entityIdBytes, 0), skip, take);
+        }
+
+        //public virtual Task<T[]> Get(int skip, int take)
+        //{
+        //    var skey = GetKey(userId, 1);
+        //    return Get(skey, entityIdBytes => GetKey(userId, entityIdBytes, 0), skip, take);
+        //}
+
+        protected virtual async Task<T[]> Get(byte[] skey, Func<byte[], byte[]> resolveKey, int skip, int take)
+        {
+            //var skey = GetKey(userId, 1);
             using (var iterator = db.NewIterator())
             {
                 List<T> list = new List<T>();
@@ -118,7 +130,8 @@ namespace Borlay.Repositories.RocksDb
                     {
                         var entityIdBytes = it.Value();
 
-                        var key = GetKey(userId, entityIdBytes, 0);
+                        //var key = GetKey(userId, entityIdBytes, 0);
+                        var key = resolveKey(entityIdBytes);
                         var value = db.Get(key);
 
                         var index = 0;
@@ -138,48 +151,43 @@ namespace Borlay.Repositories.RocksDb
             }
         }
 
-        protected virtual byte[] GetKey(ByteArray userId, byte bit)
-        {
-            var key = new byte[userName.Length + userId.Bytes.Length + entityName.Length + 1];
-
-            var index = 0;
-            key.CopyFrom(userName, ref index);
-            key.CopyFrom(userId, ref index);
-            key[index++] = bit;
-            key.CopyFrom(entityName, ref index);
-            return key;
-        }
-
-        protected virtual byte[] GetScoreBytes(long score)
-        {
-            if (Order == Order.Desc)
-                score = long.MaxValue - score;
-
-            var scoreBytes = BitConverter.GetBytes(score);
-            if (BitConverter.IsLittleEndian)
-                Array.Reverse(scoreBytes);
-
-            return scoreBytes;
-        }
-
-        protected virtual byte[] GetScoreKey(ByteArray userId, ByteArray entityId, long score)
-        {
-            var scoreBytes = GetScoreBytes(score);
-            return GetScoreKey(userId, entityId, scoreBytes);
-        }
-
-        protected virtual byte[] GetScoreKey(ByteArray userId, ByteArray entityId, byte[] scoreBytes)
-        {
-            var key = new byte[userName.Length + userId.Bytes.Length + entityName.Length + scoreBytes.Length + entityId.Length + 1];
-
-            var index = 0;
-            key.CopyFrom(userName, ref index);
-            key.CopyFrom(userId, ref index);
-            key[index++] = 1;
-            key.CopyFrom(entityName, ref index);
-            key.CopyFrom(scoreBytes, ref index);
-            key.CopyFrom(entityId, ref index);
-            return key;
-        }
+        
     }
+
+
+
+
+
+    //bool addSKey = true;
+    //if (!AllowOrderDublicates)
+    //{
+    //    var existScoreBytes = db.Get(scoreKey);
+    //    if (existScoreBytes != null && existScoreBytes.Length > 0)
+    //    {
+    //        if (BitConverter.IsLittleEndian)
+    //            Array.Reverse(existScoreBytes);
+
+    //        var existScore = BitConverter.ToInt64(existScoreBytes, 0);
+
+    //        if (Order == Order.Desc)
+    //            existScore = long.MaxValue - existScore;
+
+    //        //replaced bellow
+    //        //if (existScore == score)
+    //        //    addSKey = false;
+
+    //        if (existScore != score)
+    //        {
+    //            if (BitConverter.IsLittleEndian)
+    //                Array.Reverse(existScoreBytes);
+
+    //            var existskey = GetScoreKey(userId, entity.Id, existScoreBytes);
+    //            var val = db.Get(existskey);
+
+    //            batch.Delete(existskey);
+    //        }
+    //        else
+    //            addSKey = false;
+    //    }
+    //}
 }

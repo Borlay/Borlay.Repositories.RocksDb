@@ -19,7 +19,13 @@ namespace Borlay.Repositories.RocksDb.Tests
 
             var dbOptions = new RocksDbSharp.DbOptions();
             dbOptions.SetCreateIfMissing();
-            var rocksDb = RocksDbSharp.RocksDb.Open(dbOptions, @"C:\rocks\secondaryrepositoriestst\");
+            //dbOptions.SetWALTtlSeconds();
+
+            //RocksDbSharp.ColumnFamilyOptions op = new RocksDbSharp.ColumnFamilyOptions();
+            //RocksDbSharp.ColumnFamilies cf = new RocksDbSharp.ColumnFamilies(op);
+
+
+             var rocksDb = RocksDbSharp.RocksDb.Open(dbOptions, @"C:\rocks\secondaryrepositoriestst\");
 
             var repository = new SortedSecondaryRepository<TestEntity>(rocksDb, serializer);
 
@@ -75,7 +81,7 @@ namespace Borlay.Repositories.RocksDb.Tests
 
             var repository = new SortedSecondaryRepository<TestEntity>(rocksDb, serializer);
 
-            repository.AllowOrderDublicates = true;
+            //repository.AllowOrderDublicates = false;
 
             try
             {
@@ -91,7 +97,7 @@ namespace Borlay.Repositories.RocksDb.Tests
 
                 var watch = Stopwatch.StartNew();
 
-                for (int i = 0; i < 100000; i++)
+                for (int i = 0; i < 10000; i++)
                 {
                     e1.Score = i;
                     repository.Save(user1, entities);

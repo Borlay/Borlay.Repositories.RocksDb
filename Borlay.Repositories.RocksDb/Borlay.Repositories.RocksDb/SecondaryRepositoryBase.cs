@@ -12,11 +12,14 @@ namespace Borlay.Repositories.RocksDb
     {
         public static int BufferSize { get; set; } = 512;
 
+        public bool AddInsertDate { get; set; } = true;
+
         protected readonly ISerializer serializer;
         protected readonly RocksDbSharp.RocksDb db;
 
-        public static byte[] entityName { get; set; } = Encoding.UTF8.GetBytes(typeof(T).Name);
-        public static byte[] userName { get; set; } = Encoding.UTF8.GetBytes("secondary");
+        public static byte[] entityName { get; set; } = Encoding.UTF8.GetBytes($"entity:{typeof(T).Name}:");
+        public static byte[] dataName { get; set; } = Encoding.UTF8.GetBytes("data:secondary:");
+        public static byte[] insertName { get; set; } = Encoding.UTF8.GetBytes("operation:");
 
         public SecondaryRepositoryBase(RocksDbSharp.RocksDb rocksDb, Serializer serializer)
         {
@@ -59,20 +62,85 @@ namespace Borlay.Repositories.RocksDb
 
         protected virtual byte[] GetKey(ByteArray userId, byte[] entityId, byte bit)
         {
-            var key = new byte[userName.Length + userId.Bytes.Length + entityName.Length + entityId.Length + 1];
+            var key = new byte[dataName.Length + userId.Bytes.Length + entityName.Length + entityId.Length + 1];
 
             var index = 0;
-            key.CopyFrom(userName, ref index);
-            key.CopyFrom(userId, ref index);
-            key[index++] = bit;
+            key.CopyFrom(dataName, ref index);
+            key[index++] = bit; // todo change to enum
             key.CopyFrom(entityName, ref index);
+            key.CopyFrom(userId, ref index);
             key.CopyFrom(entityId, ref index);
             return key;
         }
+
+        protected virtual byte[] GetKey(ByteArray userId, byte bit)
+        {
+            var key = new byte[dataName.Length + userId.Bytes.Length + entityName.Length + 1];
+
+            var index = 0;
+            key.CopyFrom(dataName, ref index);
+            key[index++] = bit;
+            key.CopyFrom(entityName, ref index);
+            key.CopyFrom(userId, ref index);
+            return key;
+        }
+
+        protected virtual byte[] GetScoreKey(ByteArray userId, ByteArray entityId, long score, Order order)
+        {
+            var scoreBytes = GetScoreBytes(score, order);
+            return GetScoreKey(userId, entityId, scoreBytes);
+        }
+
+        protected virtual byte[] GetScoreKey(ByteArray userId, ByteArray entityId, byte[] scoreBytes)
+        {
+            var key = new byte[dataName.Length + userId.Bytes.Length + entityName.Length + scoreBytes.Length + entityId.Length + 1];
+
+            var index = 0;
+            key.CopyFrom(dataName, ref index);
+            key[index++] = 1;
+            key.CopyFrom(entityName, ref index);
+            key.CopyFrom(userId, ref index);
+            key.CopyFrom(scoreBytes, ref index);
+            key.CopyFrom(entityId, ref index);
+            return key;
+        }
+
+        protected virtual byte[] GetDateKey(ByteArray userId, ByteArray entityId, DateTime date, Order order)
+        {
+            var offset = new DateTimeOffset(date);
+            var score = offset.ToUnixTimeMilliseconds();
+            var scoreBytes = GetScoreBytes(score, order);
+
+            var key = new byte[insertName.Length + entityName.Length + entityId.Length + userId.Length + 8 + 1];
+
+            var index = 0;
+            key.CopyFrom(insertName, ref index);
+            key[index++] = 1;
+            key.CopyFrom(entityName, ref index);
+            key.CopyFrom(scoreBytes, ref index);
+            key.CopyFrom(userId, ref index);
+            key.CopyFrom(entityId, ref index);
+            
+            return key;
+        }
+
+        protected virtual byte[] GetScoreBytes(long score, Order order)
+        {
+            if (order == Order.Desc)
+                score = long.MaxValue - score;
+
+            var scoreBytes = BitConverter.GetBytes(score);
+            if (BitConverter.IsLittleEndian)
+                Array.Reverse(scoreBytes);
+
+            return scoreBytes;
+        }
     }
 
+    [Flags]
     public enum Order
     {
+        None = 0,
         Asc = 1,
         Desc = 2
     }
