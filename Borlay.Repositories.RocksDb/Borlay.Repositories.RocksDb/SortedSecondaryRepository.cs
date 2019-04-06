@@ -10,9 +10,9 @@ namespace Borlay.Repositories.RocksDb
 {
     public class SortedSecondaryRepository<T> : SecondaryRepositoryBase<T>, ISortedSecondaryRepository<T> where T : IEntity
     {
-        public Order SaveOrder { get; set; } = Order.Desc;
-        public Order ScoreOrder { get; set; } = Order.Desc;
-        public Order DateOrder { get; set; } = Order.Desc;
+        public OrderType SaveOrder { get; set; } = OrderType.Desc;
+        public OrderType ScoreOrder { get; set; } = OrderType.Desc;
+        public OrderType DateOrder { get; set; } = OrderType.Desc;
 
         protected readonly WriteOptions writeOptions;
 
@@ -47,7 +47,7 @@ namespace Borlay.Repositories.RocksDb
 
         public void Append(WriteBatch batch, ByteArray userId, T entity)
         {
-            var key = GetKey(userId, entity.Id, 0);
+            var key = GetUserEntityKey(userId, entity.Id, 0);
             var value = new byte[BufferSize];
             var index = 0;
             serializer.AddBytes(entity, value, ref index);
@@ -57,55 +57,55 @@ namespace Borlay.Repositories.RocksDb
             if (entity is IScoreEntity scoreEntity)
             {
                 var score = scoreEntity.Score;
-                if (ScoreOrder.HasFlag(Order.Asc))
+                if (ScoreOrder.HasFlag(OrderType.Asc))
                 {
-                    var skey = GetScoreKey(userId, entity.Id, score, Order.Asc);
-                    batch.Put(skey, entity.Id.Bytes);
+                    var skey = GetUserOrderKey(userId, entity.Id, DataType.Score, score, OrderType.Asc);
+                    batch.Put(skey, key);
                 }
 
-                if (ScoreOrder.HasFlag(Order.Desc))
+                if (ScoreOrder.HasFlag(OrderType.Desc))
                 {
-                    var skey = GetScoreKey(userId, entity.Id, score, Order.Desc);
-                    batch.Put(skey, entity.Id.Bytes);
+                    var skey = GetUserOrderKey(userId, entity.Id, DataType.Score, score, OrderType.Desc);
+                    batch.Put(skey, key);
                 }
             }
 
             if (entity is IDateEntity dateEntity)
             {
                 var score = dateEntity.Date;
-                if (DateOrder.HasFlag(Order.Asc))
+                if (DateOrder.HasFlag(OrderType.Asc))
                 {
-                    var skey = GetDateKey(userId, entity.Id, score, Order.Asc); // todo dont use GetDateKey, see bellow
-                    batch.Put(skey, entity.Id.Bytes);
+                    var skey = GetUserOrderKey(userId, entity.Id, DataType.Date, score, OrderType.Asc); // todo dont use GetDateKey, see bellow
+                    batch.Put(skey, key);
                 }
 
-                if (DateOrder.HasFlag(Order.Desc))
+                if (DateOrder.HasFlag(OrderType.Desc))
                 {
-                    var skey = GetDateKey(userId, entity.Id, score, Order.Desc);
-                    batch.Put(skey, entity.Id.Bytes);
+                    var skey = GetUserOrderKey(userId, entity.Id, DataType.Date, score, OrderType.Desc);
+                    batch.Put(skey, key);
                 }
             }
 
 
             var date = DateTime.Now;
 
-            if (SaveOrder.HasFlag(Order.Asc))
+            if (SaveOrder.HasFlag(OrderType.Asc))
             {
-                var dateKey = GetDateKey(userId, entity.Id, date, Order.Asc);
+                var dateKey = GetEntityOrderKey(userId, entity.Id, DataType.Save, date, OrderType.Asc);
                 batch.Put(dateKey, key);
             }
 
-            if (SaveOrder.HasFlag(Order.Desc))
+            if (SaveOrder.HasFlag(OrderType.Desc))
             {
-                var dateKey = GetDateKey(userId, entity.Id, date, Order.Desc);
+                var dateKey = GetEntityOrderKey(userId, entity.Id, DataType.Save, date, OrderType.Desc);
                 batch.Put(dateKey, key);
             }
         }
 
         public virtual Task<T[]> Get(ByteArray userId, int skip, int take)
         {
-            var skey = GetKey(userId, 1);
-            return Get(skey, entityIdBytes => GetKey(userId, entityIdBytes, 0), skip, take);
+            var skey = GetUserKey(userId, DataType.Save);
+            return Get((byte[])skey, (byte[] entityIdBytes) => base.GetUserEntityKey(userId, entityIdBytes, 0), skip, take);
         }
 
         //public virtual Task<T[]> Get(int skip, int take)

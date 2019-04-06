@@ -17,7 +17,7 @@ namespace Borlay.Repositories.RocksDb
 
         public virtual async Task Save(ByteArray userId, T entity)
         {
-            var key = GetKey(userId, entity.Id, 0);
+            var key = GetUserEntityKey(userId, entity.Id, 0);
 
             var value = new byte[BufferSize];
             var index = 0;
