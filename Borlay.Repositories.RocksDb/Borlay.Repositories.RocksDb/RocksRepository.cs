@@ -9,43 +9,39 @@ namespace Borlay.Repositories.RocksDb
 {
     public class RocksRepository
     {
-        public RocksDbSharp.RocksDb db { get; }
-        public WriteOptions writeOptions { get; }
-        public OrderType[] indexOrders { get; } = new OrderType[256];
+        public RocksDbSharp.RocksDb Database { get; }
+        public WriteOptions WriteOptions { get; }
+        public IndexGenerator IndexGenerator { get; }
+        public IIndexOrderProvider IndexOrders { get; set; }
 
-        public IndexGenerator indexGenerator { get; }
 
         public RocksRepository(RocksDbSharp.RocksDb db, IndexGenerator indexGenerator)
+            : this(db, indexGenerator, new IndexOrderProvider())
         {
-            this.db = db;
+        }
 
-            writeOptions = new WriteOptions();
+        public RocksRepository(RocksDbSharp.RocksDb db, IndexGenerator indexGenerator, IIndexOrderProvider indexOrders)
+        {
+            this.Database = db;
+
+            WriteOptions = new WriteOptions();
             //writeOptions.SetSync(true);
 
-            this.indexGenerator = indexGenerator;
-        }
-
-        public void SetOrder(OrderIndexType indexType, OrderType orderType)
-        {
-            indexOrders[(byte)indexType] = orderType;
-        }
-
-        public OrderType GetOrder(OrderIndexType indexType)
-        {
-            return indexOrders[(byte)indexType];
+            this.IndexGenerator = indexGenerator;
+            this.IndexOrders = indexOrders;
         }
 
         public virtual async Task<byte[]> Get(ByteArray userId, ByteArray entityId)
         {
-            var key = indexGenerator.GetUserEntityKey(userId, entityId, DataType.Entity);
-            var value = db.Get(key);
+            var key = IndexGenerator.GetParentEntityKey(userId, entityId);
+            var value = Database.Get(key);
             return value;
         }
 
         public virtual async Task<KeyValuePair<ByteArray, byte[]>[]> Get(ByteArray userId, ByteArray[] entityIds)
         {
-            var keys = entityIds.Select(id => indexGenerator.GetUserEntityKey(userId, id, DataType.Entity)).ToArray();
-            var values = db.MultiGet(keys);
+            var keys = entityIds.Select(id => IndexGenerator.GetParentEntityKey(userId, id)).ToArray();
+            var values = Database.MultiGet(keys);
 
             var result = new KeyValuePair<ByteArray, byte[]>[values.Length];
 
@@ -63,88 +59,128 @@ namespace Borlay.Repositories.RocksDb
             return result;
         }
 
-        public virtual Task<T[]> Get(ByteArray userId, int skip, int take)
+        public virtual IEnumerable<byte[]> Get(ByteArray parentId, OrderType orderType)
         {
-            var skey = indexGenerator.GetOrderKey(userId, DataType.Index);
-            return Get((byte[])skey, (byte[] entityIdBytes) => base.GetUserEntityKey(userId, entityIdBytes, 0), skip, take);
+            var skey = IndexGenerator.GetParentOrderKey(parentId, orderType);
+            return Get(skey);
         }
 
-        //public virtual Task<T[]> Get(int skip, int take)
-        //{
-        //    var skey = GetKey(userId, 1);
-        //    return Get(skey, entityIdBytes => GetKey(userId, entityIdBytes, 0), skip, take);
-        //}
-
-        protected virtual async Task<byte[][]> Get(byte[] skey, Func<byte[], byte[]> resolveKey, int skip, int take)
+        public virtual IEnumerable<byte[]> Get(OrderType orderType)
         {
-            //var skey = GetKey(userId, 1);
-            using (var iterator = db.NewIterator())
+            var skey = IndexGenerator.GetEntityOrderKey(orderType);
+            return Get(skey);
+        }
+
+        protected virtual IEnumerable<byte[]> Get(byte[] indexKey)
+        {
+            using (var iterator = Database.NewIterator())
             {
-                List<byte[]> list = new List<byte[]>();
-
-                var it = iterator.Seek(skey);
-                while (it.Valid() && take != 0)
+                var it = iterator.Seek(indexKey);
+                while (it.Valid())
                 {
-                    if (!it.Key().ContainsSequence32(skey)) break;
+                    if (!it.Key().ContainsSequence32(indexKey)) break;
 
-                    if (skip <= 0)
-                    {
-                        var entityIdBytes = it.Value();
-
-                        var key = resolveKey(entityIdBytes);
-                        var value = db.Get(key);
-
-                        //var index = 0;
-                        //var entity = serializer.GetObject(value, ref index);
-                        list.Add(value);
-                        take--;
-
-                        if (take == 0) break;
-                    }
-                    else
-                        skip--;
+                    var key = it.Value();
+                    var value = Database.Get(key);
+                    if (value == null || value.Length == 0)
+                        continue;
+                    yield return value;
 
                     it = it.Next();
                 }
-
-                return list.ToArray();
             }
         }
 
 
-        public IRepositoryTransaction CreateTransaction()
+        public ISecondaryRepositoryTransaction CreateTransaction()
         {
             return new RocksRepositoryTransaction(this);
         }
+
+        //public virtual Task<byte[][]> Get(ByteArray userId, OrderType orderType, int skip, int take)
+        //{
+        //    var skey = indexGenerator.GetParentOrderKey(userId, orderType);
+        //    return Get(skey, skip, take);
+        //}
+
+        //public virtual Task<byte[][]> Get(OrderType orderType, int skip, int take)
+        //{
+        //    var skey = indexGenerator.GetEntityOrderKey(orderType);
+        //    return Get(skey, skip, take);
+        //}
+
+        //protected virtual async Task<byte[][]> Get(byte[] skey, int skip, int take)
+        //{
+
+        //}
+    }
+
+    public interface IIndexOrderProvider
+    {
+        void SetOrder(Type type, IndexLevel indexLevel, OrderType orderType);
+        OrderType GetOrder(Type type, IndexLevel indexType);
+    }
+
+    public class IndexOrderProvider : IIndexOrderProvider
+    {
+        private readonly Dictionary<Type, OrderType[]> indexOrders = new Dictionary<Type, OrderType[]>();
+
+        public void SetOrder(Type type, IndexLevel indexLevel, OrderType orderType)
+        {
+            if (indexOrders.TryGetValue(type, out var orders))
+                orders[(byte)indexLevel] = orderType;
+            else
+            {
+                orders = new OrderType[256];
+                orders[(byte)indexLevel] = orderType;
+                indexOrders[type] = orders;
+            }
+        }
+
+        public OrderType GetOrder(Type type, IndexLevel indexLevel)
+        {
+            if (indexOrders.TryGetValue(type, out var orders))
+                return orders[(byte)indexLevel];
+
+            return OrderType.None;
+            //throw new KeyNotFoundException($"Index order for type '{type.Name}' and level '{indexLevel}' not found");
+        }
+    }
+
+    public interface IIndex
+    {
+        IndexLevel Level { get; }
+    }
+
+    public class Index : IIndex
+    {
+        public IndexLevel Level { get; set; }
     }
 
     public interface IOrderIndex
     {
-        OrderIndexType Type { get; }
+        long GetScore();
     }
 
-    public class OrderIndex : IOrderIndex
-    {
-        public OrderIndexType Type { get; set; }
-    }
-
-    public interface IScoreIndex : IOrderIndex
-    {
-        long Score { get; }
-    }
-
-    public interface IDateIndex : IOrderIndex
-    {
-        DateTime Date { get; }
-    }
-
-    public class ScoreOrderIndex : OrderIndex, IScoreIndex
+    public class ScoreIndex : Index, IOrderIndex
     {
         public long Score { get; set; }
+
+        public virtual long GetScore()
+        {
+            return Score;
+        }
     }
 
-    public class DateOrderIndex : OrderIndex, IDateIndex
+    public class DateIndex : Index, IOrderIndex
     {
         public DateTime Date { get; set; }
+
+        public virtual long GetScore()
+        {
+            var offset = new DateTimeOffset(Date);
+            var score = offset.ToUnixTimeMilliseconds();
+            return score;
+        }
     }
 }
