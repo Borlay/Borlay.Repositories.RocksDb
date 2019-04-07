@@ -2,6 +2,13 @@
 
   <PropertyGroup>
     <TargetFramework>netstandard1.6</TargetFramework>
+    <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
+    <Authors>Paulius Kanoverskis</Authors>
+    <PackageProjectUrl>http://borlay.org</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/Borlay/Borlay.Repositories.RocksDb.git</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageTags>Repository RocksDb Key Value Database</PackageTags>
+    <Copyright>Paulius Kanoverskis</Copyright>
   </PropertyGroup>
 
   <ItemGroup>
