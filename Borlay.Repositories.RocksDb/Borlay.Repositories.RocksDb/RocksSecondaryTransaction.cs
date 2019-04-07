@@ -7,25 +7,25 @@ using System.Threading.Tasks;
 
 namespace Borlay.Repositories.RocksDb
 {
-    public class RocksRepositoryTransaction : ISecondaryRepositoryTransaction
+    public class RocksSecondaryTransaction : ISecondaryTransaction
     {
         protected readonly WriteBatch batch;
-        protected readonly RocksRepository repository;
+        protected readonly RocksSecondaryRepository repository;
 
-        public RocksRepositoryTransaction(RocksRepository repository)
+        public RocksSecondaryTransaction(RocksSecondaryRepository repository)
         {
             this.batch = new WriteBatch();
             this.repository = repository;
         }
 
-        public async Task<byte[]> AppendValue(ByteArray userId, ByteArray entityId, byte[] value, int valueLength)
+        public byte[] AppendValue(ByteArray userId, ByteArray entityId, byte[] value, int valueLength)
         {
             var key = repository.IndexGenerator.GetParentEntityKey(userId, entityId);
             batch.Put(key, (ulong)key.Length, value, (ulong)valueLength);
             return key;
         }
 
-        public async Task AppendIndexes(ByteArray parentId, ByteArray entityId, byte[] key, params Index[] indexes)
+        public void AppendIndexes(ByteArray parentId, ByteArray entityId, byte[] key, params Index[] indexes)
         {
             foreach (var index in indexes)
             {
@@ -35,12 +35,12 @@ namespace Borlay.Repositories.RocksDb
                 if (index is IOrderIndex orderIndex)
                 {
                     var score = orderIndex.GetScore();
-                    await AppendOrderIndex(parentId, entityId, key, indexLevel, score, order);
+                    AppendOrderIndex(parentId, entityId, key, indexLevel, score, order);
                 }
             }
         }
 
-        public async Task AppendOrderIndex(ByteArray parentId, ByteArray entityId, byte[] key, IndexLevel indexLevel, long score, OrderType orders)
+        public void AppendOrderIndex(ByteArray parentId, ByteArray entityId, byte[] key, IndexLevel indexLevel, long score, OrderType orders)
         {
             if (orders.HasFlag(OrderType.Asc))
             {
@@ -48,14 +48,14 @@ namespace Borlay.Repositories.RocksDb
                 batch.Put(orderKey, key);
             }
 
-            if (orders.HasFlag(Order.Desc))
+            if (orders.HasFlag(OrderType.Desc))
             {
                 var orderKey = repository.IndexGenerator.GetOrderKey(parentId, entityId, indexLevel, score, OrderType.Desc);
                 batch.Put(orderKey, key);
             }
         }
 
-        public void Commit()
+        public async Task Commit()
         {
             repository.Database.Write(batch, repository.WriteOptions);
         }
@@ -66,23 +66,5 @@ namespace Borlay.Repositories.RocksDb
         }
     }
 
-    public interface ICommit
-    {
-        void Commit();
-    }
-
-    public interface ITransaction : ICommit, IDisposable
-    {
-    }
-
-    public interface ISecondaryRepositoryTransaction : ITransaction, IDisposable
-    {
-        Task<byte[]> AppendValue(ByteArray parentId, ByteArray entityId, byte[] value, int valueLength);
-
-        Task AppendIndexes(ByteArray parentId, ByteArray entityId, byte[] key, params Index[] indexes);
-
-        Task AppendOrderIndex(ByteArray parentId, ByteArray entityId, byte[] key, IndexLevel indexLevel, long score, OrderType orders);
-
-        void Commit();
-    }
+    
 }

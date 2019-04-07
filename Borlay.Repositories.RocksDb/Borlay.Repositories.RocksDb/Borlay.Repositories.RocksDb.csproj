@@ -6,8 +6,7 @@
 
   <ItemGroup>
     <PackageReference Include="Borlay.Arrays" Version="1.0.2" />
-    <PackageReference Include="Borlay.Repositories" Version="1.0.5" />
-    <PackageReference Include="Borlay.Serialization" Version="1.0.3" />
+    <PackageReference Include="Borlay.Repositories" Version="1.0.6" />
     <PackageReference Include="RocksDbNative" Version="5.17.2" />
     <PackageReference Include="RocksDbSharp" Version="5.17.2" />
   </ItemGroup>
