@@ -9,6 +9,8 @@
     <RepositoryType>git</RepositoryType>
     <PackageTags>Repository RocksDb Key Value Database</PackageTags>
     <Copyright>Paulius Kanoverskis</Copyright>
+    <PackageLicenseExpression></PackageLicenseExpression>
+    <PackageLicenseFile>LICENSE</PackageLicenseFile>
   </PropertyGroup>
 
   <ItemGroup>
@@ -16,6 +18,13 @@
     <PackageReference Include="Borlay.Repositories" Version="1.0.6" />
     <PackageReference Include="RocksDbNative" Version="5.17.2" />
     <PackageReference Include="RocksDbSharp" Version="5.17.2" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="..\..\LICENSE">
+      <Pack>True</Pack>
+      <PackagePath></PackagePath>
+    </None>
   </ItemGroup>
 
 </Project>
