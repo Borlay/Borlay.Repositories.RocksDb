@@ -64,6 +64,18 @@ namespace Borlay.Repositories.RocksDb
         {
             batch.Dispose();
         }
+
+        public void Remove(ByteArray parentId, ByteArray entityId)
+        {
+            var key = repository.IndexGenerator.GetParentEntityKey(parentId, entityId);
+            batch.Delete(key);
+        }
+
+        public void Remove(ByteArray parentId, ByteArray[] entityIds)
+        {
+            foreach (var entityId in entityIds)
+                Remove(parentId, entityId);
+        }
     }
 
     

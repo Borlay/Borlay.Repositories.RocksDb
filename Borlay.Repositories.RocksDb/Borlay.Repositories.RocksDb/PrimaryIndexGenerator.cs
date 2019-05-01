@@ -36,6 +36,19 @@ namespace Borlay.Repositories.RocksDb
             return key;
         }
 
+        public virtual byte[] GetEntityName()
+        {
+            var key = new byte[prefix.Length + entityName.Length + 3];
+
+            var index = 0;
+            key.CopyFrom(prefix, ref index);
+            key[index++] = (byte)DataType.Entity;
+            key[index++] = 0;
+            key[index++] = 0;
+            key.CopyFrom(entityName, ref index);
+            return key;
+        }
+
         public byte[] GetOrderKey(ByteArray entityId, long score, OrderType order)
         {
             var orderBytes = GetOrderBytes(score, order);

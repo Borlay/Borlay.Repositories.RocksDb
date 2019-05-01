@@ -70,5 +70,18 @@ namespace Borlay.Repositories.RocksDb
         {
             return new RocksPrimaryTransaction(this);
         }
+
+        public IEnumerable<byte[]> Get()
+        {
+            var skey = IndexGenerator.GetEntityName();
+            return Database.Search(skey);
+        }
+
+        public bool Contains(ByteArray entityId)
+        {
+            var key = IndexGenerator.GetEntityKey(entityId);
+            var value = Database.Get(key);
+            return value != null;
+        }
     }
 }
