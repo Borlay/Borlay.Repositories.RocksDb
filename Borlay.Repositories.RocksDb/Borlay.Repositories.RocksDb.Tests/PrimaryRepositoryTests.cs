@@ -92,7 +92,7 @@ namespace Borlay.Repositories.RocksDb.Tests
                     transaction.Commit();
                 }
 
-                var result = repository.GetValues(OrderType.Asc).ToArray();
+                var result = repository.GetValues(OrderType.Asc, false).ToArray();
 
                 Assert.IsNotNull(result);
                 Assert.AreEqual(3, result.Length);
