@@ -31,25 +31,25 @@ namespace Borlay.Repositories.RocksDb.Tests
                 using (var transaction = repository.CreateTransaction())
                 {
                     var key1 = transaction.AppendValue(id1, value1.Bytes, value1.Length);
-                    transaction.AppendOrderIndex(id1, key1, IndexLevel.Entity, 12, OrderType.Desc);
+                    transaction.AppendScoreIndex(id1, key1, 12, IndexLevel.Entity, OrderType.Desc);
 
                     var key2 = transaction.AppendValue(id2, value2.Bytes, value2.Length);
-                    transaction.AppendOrderIndex(id2, key2, IndexLevel.Entity, 15, OrderType.Desc);
+                    transaction.AppendScoreIndex(id2, key2, 15, IndexLevel.Entity, OrderType.Desc);
 
                     var key3 = transaction.AppendValue(id3, value3.Bytes, value3.Length);
-                    transaction.AppendOrderIndex(id3, key3, IndexLevel.Entity, 14, OrderType.Desc);
+                    transaction.AppendScoreIndex(id3, key3, 14, IndexLevel.Entity, OrderType.Desc);
 
                     transaction.Commit();
                 }
 
-                var result = repository.Get(OrderType.Desc).ToArray();
+                var result = repository.GetValues(OrderType.Desc).ToArray();
 
                 Assert.IsNotNull(result);
                 Assert.AreEqual(3, result.Length);
 
-                Assert.IsTrue(result[0].ContainsSequence32(value2.Bytes));
-                Assert.IsTrue(result[1].ContainsSequence32(value3.Bytes));
-                Assert.IsTrue(result[2].ContainsSequence32(value1.Bytes));
+                Assert.IsTrue(result[0].Value.ContainsSequence32(value2.Bytes));
+                Assert.IsTrue(result[1].Value.ContainsSequence32(value3.Bytes));
+                Assert.IsTrue(result[2].Value.ContainsSequence32(value1.Bytes));
 
             }
             finally
@@ -81,25 +81,25 @@ namespace Borlay.Repositories.RocksDb.Tests
                 using (var transaction = repository.CreateTransaction())
                 {
                     var key1 = transaction.AppendValue(id1, value1.Bytes, value1.Length);
-                    transaction.AppendOrderIndex(id1, key1, IndexLevel.Entity, 12, OrderType.Asc);
+                    transaction.AppendScoreIndex(id1, key1, 12, IndexLevel.Entity, OrderType.Asc);
 
                     var key2 = transaction.AppendValue(id2, value2.Bytes, value2.Length);
-                    transaction.AppendOrderIndex(id2, key2, IndexLevel.Entity, 15, OrderType.Asc);
+                    transaction.AppendScoreIndex(id2, key2, 15, IndexLevel.Entity, OrderType.Asc);
 
                     var key3 = transaction.AppendValue(id3, value3.Bytes, value3.Length);
-                    transaction.AppendOrderIndex(id3, key3, IndexLevel.Entity, 14, OrderType.Asc);
+                    transaction.AppendScoreIndex(id3, key3, 14, IndexLevel.Entity, OrderType.Asc);
 
                     transaction.Commit();
                 }
 
-                var result = repository.Get(OrderType.Asc).ToArray();
+                var result = repository.GetValues(OrderType.Asc).ToArray();
 
                 Assert.IsNotNull(result);
                 Assert.AreEqual(3, result.Length);
 
-                Assert.IsTrue(result[0].ContainsSequence32(value1.Bytes));
-                Assert.IsTrue(result[1].ContainsSequence32(value3.Bytes));
-                Assert.IsTrue(result[2].ContainsSequence32(value2.Bytes));
+                Assert.IsTrue(result[0].Value.ContainsSequence32(value1.Bytes));
+                Assert.IsTrue(result[1].Value.ContainsSequence32(value3.Bytes));
+                Assert.IsTrue(result[2].Value.ContainsSequence32(value2.Bytes));
 
             }
             finally

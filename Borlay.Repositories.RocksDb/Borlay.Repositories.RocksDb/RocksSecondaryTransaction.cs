@@ -35,12 +35,12 @@ namespace Borlay.Repositories.RocksDb
                 if (index is IOrderIndex orderIndex)
                 {
                     var score = orderIndex.GetScore();
-                    AppendOrderIndex(parentId, entityId, key, indexLevel, score, order);
+                    AppendScoreIndex(parentId, entityId, key, score, indexLevel, order);
                 }
             }
         }
 
-        public void AppendOrderIndex(ByteArray parentId, ByteArray entityId, byte[] key, IndexLevel indexLevel, long score, OrderType orders)
+        public void AppendScoreIndex(ByteArray parentId, ByteArray entityId, byte[] key, long score, IndexLevel indexLevel, OrderType orders)
         {
             if (orders.HasFlag(OrderType.Asc))
             {
